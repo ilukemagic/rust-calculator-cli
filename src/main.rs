@@ -10,7 +10,7 @@ enum Token {
 }
 
 fn main() {
-    println!("Weclome to the Rust Calculator!");
+    println!("Welcome to the Rust Calculator!");
     println!("Enter 'quit' to exit.");
 
     loop {
@@ -28,7 +28,7 @@ fn main() {
             break;
         }
 
-        match caculate_expression(input) {
+        match calculate_expression(input) {
             Ok(result) => println!("Result: {}", result),
             Err(e) => println!("Error: {}", e),
         }
@@ -64,6 +64,9 @@ fn tokenize(input: &str) -> Result<Vec<Token>, String> {
                 });
                 chars.next();
             }
+            ' ' => {
+                chars.next();
+            }
             _ => {
                 return Err("Invalid character".to_string());
             }
@@ -75,43 +78,66 @@ fn tokenize(input: &str) -> Result<Vec<Token>, String> {
 fn parse_expression(tokens: &[Token]) -> Result<f64, String> {
     let mut index = 0;
 
-    fn parse_term(tokens: &[Token], index: &mut usize) -> Result<f64, String> {
-        // todo
-        let mut left = parse_factor(tokens, index)?;
+    let mut result = parse_term(tokens, &mut index)?;
 
-        Ok(left)
+    while index < tokens.len() {
+        match tokens[index] {
+            Token::Plus => {
+                index += 1;
+                result += parse_term(tokens, &mut index)?;
+            }
+            Token::Minus => {
+                index += 1;
+                result -= parse_term(tokens, &mut index)?;
+            }
+            _ => break,
+        }
     }
 
-    fn parse_factor(tokens: &[Token], index: &mut usize) -> Result<f64, String> {
-        // todo
-        Ok(0.0)
-    }
-
-    parse_term(tokens, &mut index)
+    Ok(result)
 }
 
-fn caculate_expression(input: &str) -> Result<f64, String> {
-    let parts: Vec<&str> = input.split_whitespace().collect();
+fn parse_term(tokens: &[Token], index: &mut usize) -> Result<f64, String> {
+    let mut left = parse_factor(tokens, index)?;
 
-    if parts.len() != 3 {
-        return Err("Invalid input. Expected format: <number> <operator> <number>".to_string());
-    }
-
-    let num1: f64 = parts[0].parse().map_err(|_| "first number invalid")?;
-    let operator = parts[1];
-    let num2: f64 = parts[2].parse().map_err(|_| "second number invalid")?;
-
-    match operator {
-        "+" => Ok(num1 + num2),
-        "-" => Ok(num1 - num2),
-        "*" => Ok(num1 * num2),
-        "/" => {
-            if num2 == 0.0 {
-                Err("Division by zero".to_string())
-            } else {
-                Ok(num1 / num2)
+    while *index < tokens.len() {
+        match tokens[*index] {
+            Token::Multiply => {
+                *index += 1;
+                let right = parse_factor(tokens, index)?;
+                left = left * right;
             }
+            Token::Divide => {
+                *index += 1;
+                let right = parse_factor(tokens, index)?;
+                left = left / right;
+            }
+            _ => break,
         }
-        _ => Err("Invalid operator".to_string()),
     }
+
+    Ok(left)
+}
+
+fn parse_factor(tokens: &[Token], index: &mut usize) -> Result<f64, String> {
+    if *index >= tokens.len() {
+        return Err("Unexpected end of input".to_string());
+    }
+
+    match tokens[*index] {
+        Token::Number(n) => {
+            *index += 1;
+            Ok(n)
+        }
+        _ => Err("Invalid factor".to_string()),
+    }
+}
+
+fn calculate_expression(input: &str) -> Result<f64, String> {
+    let tokens = tokenize(input)?;
+    if tokens.is_empty() {
+        return Err("Empty input".into());
+    }
+    println!("Tokens: {:?}", tokens);
+    parse_expression(&tokens)
 }
